@@ -366,9 +366,12 @@ class BugReporter {
    */
   showPreview(url, type) {
     const previewContainer = document.getElementById('previewContainer');
+    const previewTitleEl = document.getElementById('previewTitle');
     previewContainer.innerHTML = '';
 
     if (type === 'image') {
+      if (previewTitleEl) previewTitleEl.classList.remove('hidden');
+      previewContainer.classList.remove('hidden');
       const image = new Image();
       image.onload = () => {
         const canvas = document.createElement('canvas');
@@ -428,12 +431,30 @@ class BugReporter {
         if (tb) tb.classList.remove('hidden');
       };
       image.src = url;
+    } else if (type === 'attachmentImage') {
+      if (previewTitleEl) previewTitleEl.classList.remove('hidden');
+      previewContainer.classList.remove('hidden');
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = 'Attachment preview';
+      previewContainer.appendChild(img);
+      const tb = document.getElementById('annotateToolbar');
+      if (tb) tb.classList.add('hidden');
     } else if (type === 'video') {
+      if (previewTitleEl) previewTitleEl.classList.remove('hidden');
+      previewContainer.classList.remove('hidden');
       const video = document.createElement('video');
       video.src = url;
       video.controls = true;
       video.style.maxWidth = '100%';
       previewContainer.appendChild(video);
+      const tb = document.getElementById('annotateToolbar');
+      if (tb) tb.classList.add('hidden');
+    } else {
+      // No preview (non-image attachments only)
+      previewContainer.innerHTML = '';
+      previewContainer.classList.add('hidden');
+      if (previewTitleEl) previewTitleEl.classList.add('hidden');
       const tb = document.getElementById('annotateToolbar');
       if (tb) tb.classList.add('hidden');
     }
@@ -481,7 +502,15 @@ class BugReporter {
   toggleDraw() {
     this.annotation.drawingEnabled = !this.annotation.drawingEnabled;
     const btn = document.getElementById('toggleDrawBtn');
-    if (btn) btn.classList.toggle('btn-primary', !!this.annotation.drawingEnabled);
+    if (btn) {
+      if (this.annotation.drawingEnabled) {
+        btn.classList.remove('btn-outline');
+        btn.classList.add('btn-primary');
+      } else {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline');
+      }
+    }
   }
 
   undoDraw() {
@@ -522,8 +551,8 @@ class BugReporter {
         const dataUrl = this.annotation.canvas.toDataURL('image/png');
         mainBlob = await this.dataURLtoBlob(dataUrl);
       }
-      if (!mainBlob) {
-        this.showNotification('No media captured', 'error');
+      if (!mainBlob && this.additionalFiles.length === 0) {
+        this.showNotification('Please capture media or attach a file', 'error');
         return;
       }
 
@@ -568,15 +597,25 @@ class BugReporter {
   handleAttachFiles(event) {
     const files = Array.from(event.target.files || []);
     const maxSize = 50 * 1024 * 1024;
-    for (const f of files) {
-      if (f.size > maxSize) {
-        this.showNotification(`${f.name} is too large (${this.formatFileSize(f.size)}). Max 50 MB.`, 'error');
-        continue;
-      }
-      this.additionalFiles.push(f);
+    if (!files.length) return;
+    const first = files[0];
+    if (first.size > maxSize) {
+      this.showNotification(`${first.name} is too large (${this.formatFileSize(first.size)}). Max 50 MB.`, 'error');
+      return;
     }
-    // Switch to preview view even if no captured media
-    this.showPreview('', '');
+    if (files.length > 1) {
+      this.showNotification('Only one attachment is allowed. Using the first file selected.', 'warning');
+    }
+    // Replace any existing file with the new one
+    this.additionalFiles = [first];
+    // Decide preview behavior based on file types
+    const firstImage = this.additionalFiles[0] && this.additionalFiles[0].type && this.additionalFiles[0].type.startsWith('image/') ? this.additionalFiles[0] : null;
+    if (firstImage) {
+      const url = URL.createObjectURL(firstImage);
+      this.showPreview(url, 'attachmentImage');
+    } else {
+      this.showPreview('', 'none');
+    }
   }
 
   renderFileList() {
@@ -588,27 +627,27 @@ class BugReporter {
       row.className = 'file-item';
       const left = document.createElement('div');
       left.innerHTML = `<span class="file-name">${file.name}</span><span class="file-meta">${this.formatFileSize(file.size)}</span>`;
-      const remove = document.createElement('button');
-      remove.className = 'file-remove';
-      remove.textContent = 'Remove';
-      remove.addEventListener('click', () => {
-        this.additionalFiles.splice(idx, 1);
-        this.renderFileList();
-        this.updateAttachmentsVisibility();
-      });
       row.appendChild(left);
-      row.appendChild(remove);
       container.appendChild(row);
     });
   }
 
   updateAttachmentsVisibility() {
     const block = document.getElementById('attachmentsBlock');
+    const addBtn = document.getElementById('addMoreFilesBtn');
     if (!block) return;
     if (this.additionalFiles.length > 0) {
       block.classList.remove('hidden');
+      if (addBtn) {
+        addBtn.disabled = false; // allow replacing file
+        addBtn.textContent = 'Replace file';
+      }
     } else {
       block.classList.add('hidden');
+      if (addBtn) {
+        addBtn.disabled = false;
+        addBtn.textContent = 'Add file';
+      }
     }
   }
 

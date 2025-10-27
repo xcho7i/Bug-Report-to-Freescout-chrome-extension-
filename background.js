@@ -1,7 +1,7 @@
 // Background service worker for Chrome extension
 // Handles screen capture permissions and background tasks
 
-console.log('Bug Reporter: Background service worker loaded');
+console.log('AES Bug Reporter: Background service worker loaded');
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -86,11 +86,11 @@ async function handleTabCapture(sendResponse) {
 // Handle extension installation
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
-    console.log('Bug Reporter extension installed');
+    console.log('AES Bug Reporter extension installed');
     // Open settings on first install
     chrome.runtime.openOptionsPage();
   } else if (details.reason === 'update') {
-    console.log('Bug Reporter extension updated');
+    console.log('AES Bug Reporter extension updated');
   }
 });
 
@@ -111,7 +111,7 @@ keepAlive();
 
 // Listen for extension startup
 chrome.runtime.onStartup.addListener(() => {
-  console.log('Bug Reporter: Extension started');
+  console.log('AES Bug Reporter: Extension started');
   keepAlive();
 });
 

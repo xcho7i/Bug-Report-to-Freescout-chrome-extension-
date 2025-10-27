@@ -472,7 +472,7 @@ class BugReporter {
 
     // Set default title
     const now = new Date();
-    document.getElementById('bugTitle').value = `Bug Report - ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
+      document.getElementById('bugTitle').value = `AES Bug Report - ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
   }
 
   redrawCanvas() {

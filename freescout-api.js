@@ -7,6 +7,15 @@ class FreeScoutAPI {
     this.mailboxId = '';
   }
 
+  async blobToBase64(blob) {
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
   /**
    * Initialize API with settings
    */
@@ -68,7 +77,12 @@ class FreeScoutAPI {
    * Create a conversation (ticket) in FreeScout
    */
   async createConversation(bugData) {
-    const apiUrl = `${this.baseUrl}/api/conversations`;
+    const candidateUrls = [
+      `${this.baseUrl}/api/conversations`,
+      // `${this.baseUrl}/api/conversations.json`,
+      // `${this.baseUrl}/api/v1/conversations`,
+      // `${this.baseUrl}/conversations` // some installs expose API under different prefix
+    ];
 
     // Build conversation body with all bug details
     const body = this.buildConversationBody(bugData);
@@ -81,8 +95,8 @@ class FreeScoutAPI {
       status: 'active',
       customer: {
         email: this.defaultAssignee || 'bugs@system.local',
-        firstName: 'Bug',
-        lastName: 'Reporter'
+        firstName: 'AES',
+        lastName: 'Bug Reporter'
       },
       threads: [
         {
@@ -102,38 +116,55 @@ class FreeScoutAPI {
     if (bugData.priority === '1') tags.push('high-priority');
     requestData.tags = tags;
 
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-FreeScout-API-Key': this.apiKey
-      },
-      body: JSON.stringify(requestData)
-    });
+    let lastErrText = '';
+    for (const apiUrl of candidateUrls) {
+      try {
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-FreeScout-API-Key': this.apiKey
+          },
+          body: JSON.stringify(requestData)
+        });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API request failed: ${response.status} - ${errorText}`);
+        if (!response.ok) {
+          lastErrText = await response.text();
+          // Try next candidate on common routing errors
+          if (response.status === 404 || response.status === 405) {
+            continue;
+          }
+          throw new Error(`API request failed: ${response.status} - ${lastErrText}`);
+        }
+
+        const result = await response.json();
+        
+        // FreeScout API returns different structures depending on version
+        if (result._embedded && result._embedded.conversations && result._embedded.conversations.length > 0) {
+          return result._embedded.conversations[0];
+        } else if (result.id) {
+          return result;
+        } else {
+          // Unexpected format; try next endpoint
+          lastErrText = JSON.stringify(result);
+          continue;
+        }
+      } catch (err) {
+        lastErrText = String(err);
+        // Try next candidate
+        continue;
+      }
     }
 
-    const result = await response.json();
-    
-    // FreeScout API returns different structures depending on version
-    // Handle both { _embedded: { conversations: [...] } } and direct conversation object
-    if (result._embedded && result._embedded.conversations && result._embedded.conversations.length > 0) {
-      return result._embedded.conversations[0];
-    } else if (result.id) {
-      return result;
-    } else {
-      throw new Error('Unexpected API response format');
-    }
+    throw new Error(`API request failed (endpoints tried: ${candidateUrls.join(', ')}). Last error: ${lastErrText}`); 
   }
 
   /**
    * Build conversation body with bug details
    */
   buildConversationBody(bugData) {
-    let body = `<h2>Bug Report</h2>\n\n`;
+    let body = `<h2>AES Bug Report</h2>\n\n`;
     body += `<p><strong>Description:</strong></p>\n`;
     body += `<p>${this.escapeHtml(bugData.description).replace(/\n/g, '<br>')}</p>\n\n`;
     
@@ -166,27 +197,71 @@ class FreeScoutAPI {
   async uploadAttachment(conversationId, blob, bugData) {
     const apiUrl = `${this.baseUrl}/api/conversations/${conversationId}/attachments`;
 
+    // For images, skip endpoints that are failing on this server and post inline immediately
+    if (blob && blob.type && blob.type.startsWith('image/')) {
+      const threadUrl = `${this.baseUrl}/api/conversations/${conversationId}/threads`;
+      try {
+        const base64 = await this.blobToBase64(blob);
+        const dataUrl = `data:${blob.type};base64,${base64}`;
+        const inlineBody = `${bugData?.description || ''}\n\n<img src="${dataUrl}" alt="inline image" />`;
+        const inlineRes = await fetch(threadUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-FreeScout-API-Key': this.apiKey
+          },
+          body: JSON.stringify({
+            type: 'customer',
+            text: inlineBody,
+            customer: { email: 'bugs@system.local' }
+          })
+        });
+        if (!inlineRes.ok) {
+          const inErr = await inlineRes.text();
+          throw new Error(`Inline image post failed: ${inErr}`);
+        }
+        return await inlineRes.json();
+      } catch (e) {
+        console.error('Inline image post error:', e);
+        throw e;
+      }
+    }
+
     // Determine file name and extension
-    const isVideo = blob.type.startsWith('video/');
-    const extension = isVideo ? 'webm' : 'png';
-    const fileName = `bug-report-${Date.now()}.${extension}`;
+    let fileName = `bug-report-${Date.now()}`;
+    if (blob && blob.name) {
+      // Preserve original filename for File attachments
+      fileName = blob.name;
+    } else if (blob && blob.type) {
+      if (blob.type.startsWith('video/')) {
+        fileName += '.webm';
+      } else if (blob.type.startsWith('image/')) {
+        fileName += '.png';
+      } else {
+        fileName += '.bin';
+      }
+    } else {
+      fileName += '.bin';
+    }
 
     // Create form data
     const formData = new FormData();
     formData.append('file', blob, fileName);
 
-    const response = await fetch(apiUrl, {
+    let response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'X-FreeScout-API-Key': this.apiKey
+        'X-FreeScout-API-Key': this.apiKey,
+        'Accept': 'application/json'
       },
       body: formData
     });
 
     if (!response.ok) {
+      const status = response.status;
       const errorText = await response.text();
-      console.error('Attachment upload failed:', errorText);
-      throw new Error(`Failed to upload attachment: ${response.status}`);
+      throw new Error(`Failed to upload attachment: ${status} - ${errorText}`);
     }
 
     return await response.json();

@@ -1,7 +1,7 @@
 :root {
-  --primary-color: #4f46e5;
-  --primary-hover: #4338ca;
-  --secondary-color: #7c3aed;
+  --primary-color: #68a6bc;
+  --primary-hover: #5a93a8;
+  --secondary-color: #549fbb;
   --success-color: #10b981;
   --danger-color: #ef4444;
   --text-primary: #1f2937;
@@ -23,7 +23,7 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Poppins', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif, -apple-system, BlinkMacSystemFont;
   font-size: 14px;
   line-height: 1.5;
   color: var(--text-primary);
@@ -139,7 +139,7 @@ body {
 }
 
 .btn-secondary:hover {
-  background: #6d28d9;
+  background: var(--primary-hover);
 }
 
 .btn-success {
@@ -381,7 +381,7 @@ body {
 .form-group select:focus {
   outline: none;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  box-shadow: 0 0 0 3px rgba(104, 166, 188, 0.15);
 }
 
 .form-group textarea {

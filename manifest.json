@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Bug Reporter for FreeScout",
+  "name": "AES Bug Reporter",
   "version": "1.0.0",
   "description": "Capture screenshots or screen recordings with audio and send bug reports directly to FreeScout",
   "permissions": [

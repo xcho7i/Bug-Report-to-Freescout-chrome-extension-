@@ -34,7 +34,7 @@ class Config {
         this.baseConfig = {};
       }
     } catch (error) {
-      console.error('Error loading freescout.config.json:', error);
+      // console.error('Error loading freescout.config.json:', error);
       this.baseConfig = {};
     }
     return this.baseConfig;
@@ -55,7 +55,7 @@ class Config {
         maxRecordingTime: 30
       };
     } catch (error) {
-      console.error('Error loading settings:', error);
+      // console.error('Error loading settings:', error);
       return this.defaults;
     }
   }
@@ -75,7 +75,7 @@ class Config {
       const result = await chrome.storage.sync.get(key);
       return result[key] !== undefined ? result[key] : this.defaults[key];
     } catch (error) {
-      console.error(`Error loading setting ${key}:`, error);
+      // console.error(`Error loading setting ${key}:`, error);
       if (key === 'freescoutUrl' || key === 'apiKey' || key === 'mailboxId') {
         return '';
       }
@@ -100,7 +100,7 @@ class Config {
       await chrome.storage.sync.set(toSave);
       return { success: true };
     } catch (error) {
-      console.error('Error saving settings:', error);
+      // console.error('Error saving settings:', error);
       return { success: false, error: error.message };
     }
   }

@@ -40,7 +40,7 @@ async function handleScreenCapture(sources, sendResponse) {
       }
     );
   } catch (error) {
-    console.error('Screen capture error:', error);
+    // console.error('Screen capture error:', error);
     sendResponse({ 
       success: false, 
       error: error.message 
@@ -75,7 +75,7 @@ async function handleTabCapture(sendResponse) {
       dataUrl: dataUrl 
     });
   } catch (error) {
-    console.error('Tab capture error:', error);
+    // console.error('Tab capture error:', error);
     sendResponse({ 
       success: false, 
       error: error.message 

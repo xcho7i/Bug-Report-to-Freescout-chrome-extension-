@@ -46,6 +46,47 @@ class BugReporter {
     this.maxRecordingTime = settings.maxRecordingTime || 30;
   }
 
+  /**
+   * Prefer Entire Screen: request streamId from background limited to ['screen']
+   * Then create a MediaStream via chrome-specific getUserMedia constraints.
+   * Falls back to null if unavailable or user cancels.
+   */
+  async getEntireScreenStream(withSystemAudio = false, quality) {
+    try {
+      const stream = await new Promise((resolve) => {
+        // Limit picker to Entire Screen only
+        chrome.desktopCapture.chooseDesktopMedia(['screen'], async (streamId) => {
+          if (!streamId) {
+            resolve(null);
+            return;
+          }
+
+          const videoMandatory = {
+            chromeMediaSource: 'desktop',
+            chromeMediaSourceId: streamId
+          };
+          if (quality && quality.frameRate && quality.frameRate.ideal) {
+            videoMandatory.maxFrameRate = quality.frameRate.ideal;
+          }
+
+          try {
+            const result = await navigator.mediaDevices.getUserMedia({
+              video: { mandatory: videoMandatory },
+              audio: withSystemAudio ? { mandatory: { chromeMediaSource: 'desktop' } } : false
+            });
+            resolve(result);
+          } catch (gumErr) {
+            resolve(null);
+          }
+        });
+      });
+
+      return stream;
+    } catch (_) {
+      return null;
+    }
+  }
+
   initUI() {
     // Main buttons
     document.getElementById('screenshotBtn').addEventListener('click', () => this.captureScreenshot());
@@ -119,10 +160,15 @@ class BugReporter {
       // Use modern API to capture a single frame from entire screen
       let screenStream = null;
       try {
-        screenStream = await navigator.mediaDevices.getDisplayMedia({
-          video: { frameRate: 1 }, // low fps; we only need one frame
-          audio: false
-        });
+        // First try explicit Entire Screen selection via desktopCapture
+        screenStream = await this.getEntireScreenStream(false, { frameRate: { ideal: 1 } });
+        if (!screenStream) {
+          // Fallback to generic getDisplayMedia (shows full picker)
+          screenStream = await navigator.mediaDevices.getDisplayMedia({
+            video: { frameRate: 1 },
+            audio: false
+          });
+        }
 
         const video = document.createElement('video');
         video.srcObject = screenStream;
@@ -152,14 +198,14 @@ class BugReporter {
         if (e && e.name === 'NotAllowedError') {
           this.showNotification('Screenshot cancelled', 'error');
         } else {
-          console.error('Full-screen screenshot error:', e);
+          // console.error('Full-screen screenshot error:', e);
           this.showNotification('Failed to capture full screen: ' + (e?.message || e), 'error');
         }
         if (screenStream) screenStream.getTracks().forEach(t => t.stop());
         this.showMainView();
       }
     } catch (error) {
-      console.error('Screenshot error:', error);
+      // console.error('Screenshot error:', error);
       this.showNotification('Screenshot failed: ' + error.message, 'error');
       this.showMainView();
     }
@@ -183,21 +229,22 @@ class BugReporter {
       const settings = await config.getSettings();
       const quality = config.getVideoQuality(settings.videoQuality);
 
-      // Prefer the modern getDisplayMedia API for screen capture
-      let displayStream = null;
-      try {
-        displayStream = await navigator.mediaDevices.getDisplayMedia({
-          video: {
-            frameRate: quality?.frameRate?.ideal || 24,
-            width: quality?.width?.ideal || 1920,
-            height: quality?.height?.ideal || 1080
-          },
-          // System audio if available (Chrome may only provide tab audio)
-          audio: settings.recordSystemAudio ? true : false
-        });
-      } catch (getDisplayErr) {
-        this.showNotification('Screen recording cancelled or failed', 'error');
-        return;
+      // Prefer Entire Screen via desktopCapture; fallback to getDisplayMedia
+      let displayStream = await this.getEntireScreenStream(!!settings.recordSystemAudio, quality);
+      if (!displayStream) {
+        try {
+          displayStream = await navigator.mediaDevices.getDisplayMedia({
+            video: {
+              frameRate: quality?.frameRate?.ideal || 24,
+              width: quality?.width?.ideal || 1920,
+              height: quality?.height?.ideal || 1080
+            },
+            audio: settings.recordSystemAudio ? true : false
+          });
+        } catch (getDisplayErr) {
+          this.showNotification('Screen recording cancelled or failed', 'error');
+          return;
+        }
       }
 
       // Optionally capture microphone audio
@@ -209,7 +256,7 @@ class BugReporter {
             video: false
           });
         } catch (audioError) {
-          console.warn('Could not capture microphone:', audioError);
+          // console.warn('Could not capture microphone:', audioError);
           this.showNotification('Recording without microphone audio', 'warning');
         }
       }
@@ -237,7 +284,7 @@ class BugReporter {
       await this.recordStream(combinedStream);
 
     } catch (error) {
-      console.error('Recording error:', error);
+      // console.error('Recording error:', error);
       this.showNotification('Recording failed: ' + error.message, 'error');
     }
   }
@@ -586,7 +633,7 @@ class BugReporter {
       }
 
     } catch (error) {
-      console.error('Submit error:', error);
+      // console.error('Submit error:', error);
       this.showNotification('Failed to submit bug report: ' + error.message, 'error');
       this.showMainView();
       document.querySelector('.capture-section').classList.add('hidden');
@@ -727,11 +774,15 @@ class BugReporter {
   showMainView() {
     document.getElementById('mainView').style.display = 'block';
     document.getElementById('settingsView').classList.add('hidden');
+    const headerEl = document.querySelector('.header');
+    if (headerEl) headerEl.style.display = '';
   }
 
   showSettings() {
     document.getElementById('mainView').style.display = 'none';
     document.getElementById('settingsView').classList.remove('hidden');
+    const headerEl = document.querySelector('.header');
+    if (headerEl) headerEl.style.display = 'none';
   }
 
   /**

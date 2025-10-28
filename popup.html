@@ -10,7 +10,8 @@
   <link rel="stylesheet" href="styles.css">
   <style>
     body {
-      width: 510px;
+      max-width: 510px;
+      min-width: 330px;
       overflow: auto;
     }
   </style>
@@ -35,7 +36,7 @@
     <!-- Main Content -->
     <div id="mainView" class="main-view">
       <!-- Capture Options -->
-      <div class="capture-section">
+      <div class="capture-section"  style="width: 310px; margin: 0 auto;">
         <h2>Capture Bug</h2>
         <div class="button-group" style="display: flex; flex-direction: column; gap: 10px; justify-content: center; align-items: center;">
           <button class="btn btn-primary" style="width: 300px;" id="screenshotBtn">
@@ -61,7 +62,7 @@
       </div>
 
       <!-- Recording Controls (Hidden initially) -->
-      <div id="recordingControls" class="recording-controls hidden" style="display: flex; align-items: center; justify-content: space-between; background: #f4f6fa; border-radius: 10px; box-shadow: 0 2px 12px 0 rgba(40, 80, 180, .07); padding: 18px 22px; max-width: 330px; margin: 0 auto 26px auto; border: 1px solid #e5e7eb;">
+      <div id="recordingControls" class="recording-controls hidden" style="width: 475px; display: flex; align-items: center; justify-content: space-between; background: #f4f6fa; border-radius: 10px; box-shadow: 0 2px 12px 0 rgba(40, 80, 180, .07); padding: 18px 22px; max-width: 330px; margin: 0 auto 26px auto; border: 1px solid #e5e7eb;">
         <div style="display: flex; align-items: center; gap: 13px;">
           <span style="width:14px; height:14px; border-radius:50%; background:#ef4444; display:inline-block; box-shadow:0 0 0 2px #fff, 0 1px 7px #ef444444;"></span>
           <span style="font-size:15px; color:#1e293b; font-weight: 500;">Recording</span>
@@ -75,7 +76,7 @@
       </div>
 
       <!-- Preview Section (Hidden initially) -->
-      <div id="previewSection" class="preview-section hidden">
+      <div id="previewSection" class="preview-section hidden" style="width: 475px;">
         <h2 id="previewTitle">Preview</h2>
         <div class="preview-container" id="previewContainer">
           <!-- Screenshot or video preview will be inserted here -->
@@ -157,7 +158,7 @@
       </div>
 
       <!-- Loading State -->
-      <div id="loadingState" class="loading-state hidden">
+      <div id="loadingState" class="loading-state hidden" style="width: 460px;">
         <div class="spinner"></div>
         <p>Submitting bug report...</p>
       </div>
@@ -176,7 +177,7 @@
     </div>
 
     <!-- Settings View -->
-    <div id="settingsView" class="settings-view hidden">
+    <div id="settingsView" class="settings-view hidden" style="width: 350px;">
       <div class="settings-header">
         <button class="back-btn" id="backBtn">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

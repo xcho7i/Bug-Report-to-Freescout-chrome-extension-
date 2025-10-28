@@ -13,6 +13,31 @@ class Config {
       videoQuality: 'medium',
       maxFileSize: 50 * 1024 * 1024 // 50 MB in bytes
     };
+    this.baseConfig = null; // Loaded from freescout.config.json
+  }
+
+  /**
+   * Ensure base config (constants) is loaded from packaged JSON
+   */
+  async ensureBaseConfigLoaded() {
+    if (this.baseConfig) return this.baseConfig;
+    try {
+      const url = chrome.runtime.getURL('freescout.config.json');
+      const res = await fetch(url);
+      if (res.ok) {
+        const json = await res.json();
+        if (json && typeof json.mailboxId === 'number') {
+          json.mailboxId = String(json.mailboxId);
+        }
+        this.baseConfig = json || {};
+      } else {
+        this.baseConfig = {};
+      }
+    } catch (error) {
+      console.error('Error loading freescout.config.json:', error);
+      this.baseConfig = {};
+    }
+    return this.baseConfig;
   }
 
   /**
@@ -21,7 +46,14 @@ class Config {
   async getSettings() {
     try {
       const result = await chrome.storage.sync.get(this.defaults);
-      return result;
+      const base = await this.ensureBaseConfigLoaded();
+      return {
+        ...result,
+        freescoutUrl: base.freescoutUrl || '',
+        apiKey: base.apiKey || '',
+        mailboxId: base.mailboxId || '',
+        maxRecordingTime: 30
+      };
     } catch (error) {
       console.error('Error loading settings:', error);
       return this.defaults;
@@ -33,10 +65,23 @@ class Config {
    */
   async getSetting(key) {
     try {
+      if (key === 'freescoutUrl' || key === 'apiKey' || key === 'mailboxId') {
+        const base = await this.ensureBaseConfigLoaded();
+        return base[key] !== undefined ? base[key] : '';
+      }
+      if (key === 'maxRecordingTime') {
+        return 30;
+      }
       const result = await chrome.storage.sync.get(key);
       return result[key] !== undefined ? result[key] : this.defaults[key];
     } catch (error) {
       console.error(`Error loading setting ${key}:`, error);
+      if (key === 'freescoutUrl' || key === 'apiKey' || key === 'mailboxId') {
+        return '';
+      }
+      if (key === 'maxRecordingTime') {
+        return 30;
+      }
       return this.defaults[key];
     }
   }
@@ -46,7 +91,13 @@ class Config {
    */
   async saveSettings(settings) {
     try {
-      await chrome.storage.sync.set(settings);
+      const toSave = { ...settings };
+      // Prevent storing constants; they are sourced from JSON
+      delete toSave.freescoutUrl;
+      delete toSave.apiKey;
+      delete toSave.mailboxId;
+      delete toSave.maxRecordingTime; // enforce 30s constant
+      await chrome.storage.sync.set(toSave);
       return { success: true };
     } catch (error) {
       console.error('Error saving settings:', error);
@@ -60,27 +111,6 @@ class Config {
   validateSettings(settings) {
     const errors = [];
 
-    // Validate FreeScout URL
-    if (settings.freescoutUrl) {
-      try {
-        new URL(settings.freescoutUrl);
-      } catch (e) {
-        errors.push('Invalid FreeScout URL');
-      }
-    } else {
-      errors.push('FreeScout URL is required');
-    }
-
-    // Validate API Key
-    if (!settings.apiKey || settings.apiKey.trim() === '') {
-      errors.push('API Key is required');
-    }
-
-    // Validate Mailbox ID
-    if (!settings.mailboxId || isNaN(parseInt(settings.mailboxId))) {
-      errors.push('Valid Mailbox ID is required');
-    }
-
     // Validate email if provided
     if (settings.defaultAssignee && settings.defaultAssignee.trim() !== '') {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -89,9 +119,12 @@ class Config {
       }
     }
 
-    // Validate recording time
-    if (settings.maxRecordingTime < 5 || settings.maxRecordingTime > 60) {
-      errors.push('Max recording time must be between 5 and 60 seconds');
+    // Recording time is fixed at 30s; no validation needed
+
+    // Validate video quality
+    const validQualities = ['low', 'medium', 'high'];
+    if (settings.videoQuality && !validQualities.includes(settings.videoQuality)) {
+      errors.push('Invalid video quality setting');
     }
 
     return {
@@ -104,8 +137,8 @@ class Config {
    * Check if settings are configured
    */
   async isConfigured() {
-    const settings = await this.getSettings();
-    return !!(settings.freescoutUrl && settings.apiKey && settings.mailboxId);
+    const base = await this.ensureBaseConfigLoaded();
+    return !!(base.freescoutUrl && base.apiKey && base.mailboxId);
   }
 
   /**

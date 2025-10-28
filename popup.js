@@ -740,13 +740,9 @@ class BugReporter {
   async loadSettingsForm() {
     const settings = await config.getSettings();
     
-    document.getElementById('freescoutUrl').value = settings.freescoutUrl || '';
-    document.getElementById('apiKey').value = settings.apiKey || '';
-    document.getElementById('mailboxId').value = settings.mailboxId || '';
     document.getElementById('defaultAssignee').value = settings.defaultAssignee || '';
     document.getElementById('recordAudio').checked = settings.recordAudio !== false;
     document.getElementById('recordSystemAudio').checked = settings.recordSystemAudio || false;
-    document.getElementById('maxRecordingTime').value = settings.maxRecordingTime || 30;
     document.getElementById('videoQuality').value = settings.videoQuality || 'medium';
   }
 
@@ -755,13 +751,9 @@ class BugReporter {
    */
   async saveSettings() {
     const settings = {
-      freescoutUrl: document.getElementById('freescoutUrl').value.trim(),
-      apiKey: document.getElementById('apiKey').value.trim(),
-      mailboxId: document.getElementById('mailboxId').value.trim(),
       defaultAssignee: document.getElementById('defaultAssignee').value.trim(),
       recordAudio: document.getElementById('recordAudio').checked,
       recordSystemAudio: document.getElementById('recordSystemAudio').checked,
-      maxRecordingTime: parseInt(document.getElementById('maxRecordingTime').value),
       videoQuality: document.getElementById('videoQuality').value
     };
 

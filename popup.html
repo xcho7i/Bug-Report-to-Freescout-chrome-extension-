@@ -61,27 +61,15 @@
       </div>
 
       <!-- Recording Controls (Hidden initially) -->
-      <div id="recordingControls" class="recording-controls hidden">
-        <div class="recording-status">
-          <div class="recording-indicator">
-            <span class="pulse"></span>
-            <span class="recording-text">Recording</span>
-          </div>
-          <div class="timer" id="timer">00:00</div>
+      <div id="recordingControls" class="recording-controls hidden" style="display: flex; align-items: center; justify-content: space-between; background: #f4f6fa; border-radius: 10px; box-shadow: 0 2px 12px 0 rgba(40, 80, 180, .07); padding: 18px 22px; max-width: 330px; margin: 0 auto 26px auto; border: 1px solid #e5e7eb;">
+        <div style="display: flex; align-items: center; gap: 13px;">
+          <span style="width:14px; height:14px; border-radius:50%; background:#ef4444; display:inline-block; box-shadow:0 0 0 2px #fff, 0 1px 7px #ef444444;"></span>
+          <span style="font-size:15px; color:#1e293b; font-weight: 500;">Recording</span>
         </div>
-        <button class="btn btn-danger" id="stopRecordBtn">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="6" y="6" width="12" height="12" fill="currentColor"/>
-          </svg>
-          <span>Stop Recording</span>
-        </button>
-      </div>
-
-      <!-- Floating Stop Button (visible during recording) -->
-      <div id="floatingStop" class="floating-stop hidden">
-        <button class="btn btn-danger" id="floatingStopBtn" title="Stop Recording">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="6" y="6" width="12" height="12" fill="currentColor"/>
+        <div id="timer" class="timer" style="font-family:'Roboto Mono', monospace; font-size:15px; color:#64748b; min-width:56px; text-align:center;">00:00</div>
+        <button class="btn" id="stopRecordBtn" style="background:#fff; border:1.5px solid #ef4444; color:#ef4444; border-radius:7px; height:34px; width:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:none; padding:0;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+            <rect x="7" y="7" width="10" height="10" rx="2" fill="#ef4444"/>
           </svg>
         </button>
       </div>
@@ -199,26 +187,10 @@
       </div>
 
       <div class="settings-content">
-        <div class="form-group">
-          <label for="freescoutUrl">FreeScout URL:</label>
-          <input type="url" id="freescoutUrl" placeholder="https://your-freescout-domain.com" />
-          <small>Your FreeScout installation URL</small>
-        </div>
+        
 
         <div class="form-group">
-          <label for="apiKey">API Key:</label>
-          <input type="password" id="apiKey" placeholder="Enter your FreeScout API key" />
-          <small>Get this from FreeScout Settings → API</small>
-        </div>
-
-        <div class="form-group">
-          <label for="mailboxId">Mailbox ID:</label>
-          <input type="number" id="mailboxId" placeholder="1" />
-          <small>The mailbox ID where bug reports will be created</small>
-        </div>
-
-        <div class="form-group">
-          <label for="defaultAssignee">Default Assignee Email (Optional):</label>
+          <label for="defaultAssignee">Company Email Address:</label>
           <input type="email" id="defaultAssignee" placeholder="developer@example.com" />
           <small>Automatically assign bug reports to this user</small>
         </div>
@@ -235,13 +207,10 @@
               <span>Record system audio (if available)</span>
             </label>
           </div>
+          <small>Maximum recording time: 30 seconds</small>
         </div>
 
-        <div class="form-group">
-          <label for="maxRecordingTime">Max Recording Time (seconds):</label>
-          <input type="number" id="maxRecordingTime" value="30" min="5" max="60" />
-          <small>Maximum: 60 seconds</small>
-        </div>
+        
 
         <div class="form-group">
           <label for="videoQuality">Video Quality:</label>
@@ -256,15 +225,7 @@
           <span>Save Settings</span>
         </button>
 
-        <div class="settings-info">
-          <h3>How to get your API credentials:</h3>
-          <ol>
-            <li>Log into your FreeScout admin panel</li>
-            <li>Go to <strong>Manage → Settings → API</strong></li>
-            <li>Generate a new API key</li>
-            <li>Find your Mailbox ID in <strong>Manage → Mailboxes</strong></li>
-          </ol>
-        </div>
+        
       </div>
     </div>
   </div>

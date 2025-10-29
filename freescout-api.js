@@ -245,7 +245,15 @@ class FreeScoutAPI {
       fileName += '.bin';
     }
 
-    // First try posting a new thread using multipart form with the file directly.
+    // First try posting a new thread with JSON attachments (base64 in body).
+    try {
+      const jsonThreadRes = await this.postThreadWithBase64Attachment(conversationId, blob, fileName, bugData?.description || '');
+      if (jsonThreadRes) return jsonThreadRes;
+    } catch (e) {
+      // Continue to next strategy on failure
+    }
+
+    // Next, try posting a new thread using multipart form with the file directly.
     // This path works on many FreeScout installs even when attachments endpoints are disabled.
     try {
       const multipartRes = await this.postThreadMultipartAttachment(conversationId, blob, fileName, bugData?.description || '');
@@ -304,6 +312,51 @@ class FreeScoutAPI {
     }
 
     return await response.json();
+  }
+
+  /**
+   * Create a thread with base64 attachment embedded in JSON body.
+   * Tries both type: 'customer' and type: 'message' for compatibility.
+   */
+  async postThreadWithBase64Attachment(conversationId, blob, fileName, descriptionText) {
+    const base64 = await this.blobToBase64(blob);
+    const threadUrl = `${this.baseUrl}/api/conversations/${conversationId}/threads`;
+
+    const basePayload = (typeVal) => ({
+      type: typeVal,
+      text: descriptionText || '',
+      customer: { email: this.defaultAssignee || 'bugs@system.local' },
+      attachments: [
+        {
+          fileName: fileName,
+          mimeType: (blob && blob.type) ? blob.type : 'application/octet-stream',
+          data: base64
+        }
+      ]
+    });
+
+    const variants = [basePayload('customer'), basePayload('message')];
+    let lastErr = '';
+    for (const payload of variants) {
+      const res = await fetch(threadUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-FreeScout-API-Key': this.apiKey
+        },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+      lastErr = await res.text();
+      // try next variant on common validation errors
+      if (res.status !== 400 && res.status !== 422) {
+        break;
+      }
+    }
+    throw new Error(`JSON thread upload failed: ${lastErr}`);
   }
 
   /**

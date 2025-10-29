@@ -3,6 +3,27 @@
 
 console.log('AES Bug Reporter: Background service worker loaded');
 
+async function setActionIconFromSvg() {
+  try {
+    const svgUrl = chrome.runtime.getURL('icons/logo.svg');
+    const sizes = [16, 32, 48, 128];
+    const imageDataMap = {};
+    for (const size of sizes) {
+      const res = await fetch(svgUrl);
+      const blob = await res.blob();
+      const bitmap = await createImageBitmap(blob, { resizeWidth: size, resizeHeight: size, resizeQuality: 'high' });
+      const canvas = new OffscreenCanvas(size, size);
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, size, size);
+      ctx.drawImage(bitmap, 0, 0, size, size);
+      imageDataMap[String(size)] = ctx.getImageData(0, 0, size, size);
+    }
+    await chrome.action.setIcon({ imageData: imageDataMap });
+  } catch (_) {
+    // ignore; default icons remain
+  }
+}
+
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'GET_SCREEN_STREAM_ID') {
@@ -89,8 +110,10 @@ chrome.runtime.onInstalled.addListener((details) => {
     console.log('AES Bug Reporter extension installed');
     // Open settings on first install
     chrome.runtime.openOptionsPage();
+    setActionIconFromSvg();
   } else if (details.reason === 'update') {
     console.log('AES Bug Reporter extension updated');
+    setActionIconFromSvg();
   }
 });
 
@@ -113,5 +136,6 @@ keepAlive();
 chrome.runtime.onStartup.addListener(() => {
   console.log('AES Bug Reporter: Extension started');
   keepAlive();
+  setActionIconFromSvg();
 });
 

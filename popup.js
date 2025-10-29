@@ -22,6 +22,12 @@ class BugReporter {
       size: 4,
       baseImageUrl: null
     };
+    this._harCapture = {
+      enabled: false,
+      tabId: null,
+      events: {},
+      attached: false
+    };
     
     this.init();
   }
@@ -44,6 +50,7 @@ class BugReporter {
   async loadSettings() {
     const settings = await config.getSettings();
     this.maxRecordingTime = settings.maxRecordingTime || 30;
+    this._harCapture.enabled = settings.includeHar !== false;
   }
 
   /**
@@ -156,6 +163,8 @@ class BugReporter {
         return;
       }
       this.showLoadingState('Capturing full screen...');
+      // Start HAR capture if enabled
+      await this.startHarCapture();
 
       // Use modern API to capture a single frame from entire screen
       let screenStream = null;
@@ -229,8 +238,11 @@ class BugReporter {
       const settings = await config.getSettings();
       const quality = config.getVideoQuality(settings.videoQuality);
 
+      // Start HAR capture if enabled
+      await this.startHarCapture();
+
       // Prefer Entire Screen via desktopCapture; fallback to getDisplayMedia
-      let displayStream = await this.getEntireScreenStream(!!settings.recordSystemAudio, quality);
+      let displayStream = await this.getEntireScreenStream(false, quality);
       if (!displayStream) {
         try {
           displayStream = await navigator.mediaDevices.getDisplayMedia({
@@ -239,7 +251,7 @@ class BugReporter {
               width: quality?.width?.ideal || 1920,
               height: quality?.height?.ideal || 1080
             },
-            audio: settings.recordSystemAudio ? true : false
+            audio: false
           });
         } catch (getDisplayErr) {
           this.showNotification('Screen recording cancelled or failed', 'error');
@@ -623,6 +635,16 @@ class BugReporter {
         timestamp: new Date().toISOString()
       };
 
+      // If HAR capture enabled, stop and attach HAR
+      try {
+        const harFile = await this.stopHarCaptureAndExport();
+        if (harFile) {
+          // Keep existing user attachment and add HAR as a second file
+          if (!this.additionalFiles) this.additionalFiles = [];
+          this.additionalFiles.push(new File([harFile], harFile.name || `network-${Date.now()}.har`, { type: 'application/json' }));
+        }
+      } catch (_) {}
+
       // Submit to FreeScout
       const result = await freeScoutAPI.createTicket(bugData, mainBlob, this.additionalFiles);
 
@@ -793,8 +815,9 @@ class BugReporter {
     
     document.getElementById('defaultAssignee').value = settings.defaultAssignee || '';
     document.getElementById('recordAudio').checked = settings.recordAudio !== false;
-    document.getElementById('recordSystemAudio').checked = settings.recordSystemAudio || false;
     document.getElementById('videoQuality').value = settings.videoQuality || 'medium';
+    const includeHarEl = document.getElementById('includeHar');
+    if (includeHarEl) includeHarEl.checked = settings.includeHar !== false;
   }
 
   /**
@@ -804,8 +827,8 @@ class BugReporter {
     const settings = {
       defaultAssignee: document.getElementById('defaultAssignee').value.trim(),
       recordAudio: document.getElementById('recordAudio').checked,
-      recordSystemAudio: document.getElementById('recordSystemAudio').checked,
-      videoQuality: document.getElementById('videoQuality').value
+      videoQuality: document.getElementById('videoQuality').value,
+      includeHar: document.getElementById('includeHar').checked
     };
 
     // Validate
@@ -823,6 +846,148 @@ class BugReporter {
       setTimeout(() => this.showMainView(), 1500);
     } else {
       this.showNotification('Failed to save settings: ' + result.error, 'error');
+    }
+  }
+
+  // HAR capture helpers
+  async startHarCapture() {
+    if (!this._harCapture.enabled || this._harCapture.attached) return;
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab || tab.id == null) return;
+      const target = { tabId: tab.id };
+      await new Promise((resolve, reject) => {
+        chrome.debugger.attach(target, '1.3', () => {
+          if (chrome.runtime.lastError) return reject(chrome.runtime.lastError);
+          resolve();
+        });
+      });
+      await new Promise((resolve, reject) => {
+        chrome.debugger.sendCommand(target, 'Network.enable', {}, () => {
+          if (chrome.runtime.lastError) return reject(chrome.runtime.lastError);
+          resolve();
+        });
+      });
+
+      this._harCapture.tabId = tab.id;
+      this._harCapture.events = {};
+      this._harCapture.attached = true;
+      this._onDebuggerEvent = (source, method, params) => {
+        if (!source || source.tabId !== this._harCapture.tabId) return;
+        const id = params && (params.requestId || params.loaderId || params.connectionId);
+        if (!id) return;
+        const rec = this._harCapture.events[id] || (this._harCapture.events[id] = {});
+        if (method === 'Network.requestWillBeSent') {
+          rec.request = params.request;
+          rec.requestTime = params.timestamp;
+          rec.wallTime = params.wallTime;
+        } else if (method === 'Network.responseReceived') {
+          rec.response = params.response;
+          rec.responseTime = params.timestamp;
+        } else if (method === 'Network.loadingFinished') {
+          rec.finishedTime = params.timestamp;
+          rec.encodedDataLength = params.encodedDataLength;
+        }
+      };
+      chrome.debugger.onEvent.addListener(this._onDebuggerEvent);
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  async stopHarCaptureAndExport() {
+    if (!this._harCapture.attached) return null;
+    const target = { tabId: this._harCapture.tabId };
+    try {
+      await new Promise((resolve) => {
+        chrome.debugger.sendCommand(target, 'Network.disable', {}, () => resolve());
+      });
+    } catch (_) {}
+    try {
+      await new Promise((resolve) => {
+        chrome.debugger.detach(target, () => resolve());
+      });
+    } catch (_) {}
+    try {
+      if (this._onDebuggerEvent) chrome.debugger.onEvent.removeListener(this._onDebuggerEvent);
+    } catch (_) {}
+
+    this._harCapture.attached = false;
+
+    // Build HAR 1.2
+    const entries = [];
+    const toHeaderArray = (headersObj) => {
+      const arr = [];
+      if (!headersObj) return arr;
+      for (const k in headersObj) arr.push({ name: k, value: String(headersObj[k]) });
+      return arr;
+    };
+    for (const key in this._harCapture.events) {
+      const rec = this._harCapture.events[key];
+      if (!rec.request) continue;
+      const startWall = rec.wallTime ? new Date(rec.wallTime * 1000).toISOString() : new Date().toISOString();
+      const endTs = (rec.finishedTime || rec.responseTime || rec.requestTime || 0);
+      const startTs = rec.requestTime || endTs;
+      const totalMs = Math.max(0, (endTs - startTs) * 1000);
+      const status = rec.response ? rec.response.status : 0;
+      const statusText = rec.response ? rec.response.statusText || '' : '';
+      const mimeType = rec.response ? (rec.response.mimeType || '') : '';
+      const contentLength = rec.encodedDataLength != null ? rec.encodedDataLength : (rec.response && rec.response.headers && (rec.response.headers['content-length'] || rec.response.headers['Content-Length'])) || 0;
+
+      entries.push({
+        startedDateTime: startWall,
+        time: totalMs,
+        request: {
+          method: rec.request.method,
+          url: rec.request.url,
+          httpVersion: 'HTTP/1.1',
+          headers: toHeaderArray(rec.request.headers),
+          queryString: [],
+          cookies: [],
+          headersSize: -1,
+          bodySize: -1
+        },
+        response: {
+          status: status,
+          statusText: statusText,
+          httpVersion: 'HTTP/1.1',
+          headers: toHeaderArray(rec.response ? rec.response.headers : {}),
+          cookies: [],
+          content: {
+            size: Number(contentLength) || 0,
+            mimeType: mimeType
+          },
+          redirectURL: '',
+          headersSize: -1,
+          bodySize: Number(contentLength) || 0
+        },
+        cache: {},
+        timings: {
+          send: 0,
+          wait: totalMs,
+          receive: 0
+        }
+      });
+    }
+
+    const har = {
+      log: {
+        version: '1.2',
+        creator: { name: 'AES Bug Reporter', version: '1.0.0' },
+        entries
+      }
+    };
+
+    const json = JSON.stringify(har);
+    // Cap size to ~10 MB
+    if (json.length > 10 * 1024 * 1024) {
+      return null;
+    }
+    const blob = new Blob([json], { type: 'application/json' });
+    try {
+      return new File([blob], `network-${Date.now()}.har`, { type: 'application/json' });
+    } catch (_) {
+      return blob;
     }
   }
 

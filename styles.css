@@ -1,7 +1,7 @@
 :root {
-  --primary-color: #68a6bc;
+  --primary-color: #488BA2;
   --primary-hover: #5a93a8;
-  --secondary-color: #549fbb;
+  --secondary-color: #A3C9D6;
   --success-color: #10b981;
   --danger-color: #ef4444;
   --text-primary: #1f2937;
@@ -29,12 +29,16 @@ body {
   color: var(--text-primary);
   background: var(--bg-secondary);
   width: 500px;
-  min-height: 500px;
+  min-height: 300px;
 }
 
 .container {
   background: var(--bg-primary);
-  min-height: 500px;
+  min-height: 300px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e6e8f0;
+  box-shadow: var(--shadow-md);
 }
 
 /* Header */
@@ -42,10 +46,18 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
+  padding: 10px 20px;
   background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
   color: white;
   box-shadow: var(--shadow-md);
+}
+
+.header h1 {
+  font-size: 18px;
+  font-weight: 600;
+  flex: 1;
+  text-align: center;
+  letter-spacing: .2px;
 }
 
 .logo {
@@ -53,6 +65,8 @@ body {
   align-items: center;
   gap: 10px;
 }
+
+.header .logo { width: 28px; }
 
 .logo h1 {
   font-size: 18px;
@@ -86,6 +100,12 @@ body {
   margin-bottom: 24px;
 }
 
+.capture-section span {
+  font-weight: 600;
+  font-size: 15px;
+  font-family: 'Poppins', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif, -apple-system, BlinkMacSystemFont;
+}
+
 .capture-section h2 {
   font-size: 16px;
   font-weight: 600;
@@ -105,11 +125,11 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 20px;
+  padding: 8px 16px;
   border: none;
   border-radius: var(--border-radius);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: var(--transition);
   box-shadow: var(--shadow-sm);
@@ -136,6 +156,11 @@ body {
 .btn-secondary {
   background: var(--secondary-color);
   color: white;
+}
+
+#recordBtn {
+  background: var(--secondary-color);
+  color: black;
 }
 
 .btn-secondary:hover {
@@ -243,8 +268,8 @@ body {
 }
 
 .preview-container {
-  background: var(--bg-secondary);
-  border: 2px dashed var(--border-color);
+  background: #f6f7f9;
+  border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   padding: 16px;
   margin-bottom: 20px;
@@ -275,8 +300,28 @@ body {
 .annotate-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  width: 100%;
+  gap: 8px 12px;
+  justify-content: space-between;
+}
+
+.annotate-field-group {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+#toggleDrawBtn, #clearDrawBtn {
+  width: 48%;
+}
+
+#toggleDrawBtn {
+  background-color: var(--primary-color);
+  color: white;
+
 }
 
 .annotate-field {
@@ -285,6 +330,30 @@ body {
   gap: 6px;
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+.annotate-field span {
+  font-weight: 600;
+}
+
+.annotate-field:nth-of-type(1) { grid-column: 1; }
+.annotate-field:nth-of-type(2) { grid-column: 1; }
+
+#undoDrawBtn {
+  grid-column: 2;
+  justify-self: end;
+  background: transparent;
+  border: none;
+  color: var(--secondary-color);
+  padding: 0;
+  height: auto;
+  box-shadow: none;
+}
+
+#undoDrawBtn:hover {
+  text-decoration: underline;
+  transform: none;
+  box-shadow: none;
 }
 
 .annotate-field input[type="color"] {
@@ -354,13 +423,13 @@ body {
 }
 
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: 5px;
 }
 
 .form-group label {
   display: block;
   font-weight: 500;
-  margin-bottom: 8px;
+  margin-bottom: 5px;
   color: var(--text-primary);
 }
 
@@ -368,7 +437,7 @@ body {
 .form-group textarea,
 .form-group select {
   width: 100%;
-  padding: 10px 12px;
+  padding: 8px 16px;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   font-size: 14px;
@@ -423,9 +492,14 @@ body {
 
 /* Action Buttons */
 .action-buttons {
-  display: grid;
-  grid-template-columns: 1fr 2fr;
+  display: flex;
+  width: 100%;
   gap: 12px;
+  justify-content: space-between;
+}
+
+#cancelBtn, #submitBtn {
+  width: 49%;
 }
 
 /* Floating Stop Button inside popup */

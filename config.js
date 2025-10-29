@@ -8,9 +8,9 @@ class Config {
       mailboxId: '',
       defaultAssignee: '',
       recordAudio: true,
-      recordSystemAudio: false,
       maxRecordingTime: 30,
       videoQuality: 'medium',
+      includeHar: true,
       maxFileSize: 50 * 1024 * 1024 // 50 MB in bytes
     };
     this.baseConfig = null; // Loaded from freescout.config.json

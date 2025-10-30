@@ -111,11 +111,14 @@ class Config {
   validateSettings(settings) {
     const errors = [];
 
-    // Validate email if provided
-    if (settings.defaultAssignee && settings.defaultAssignee.trim() !== '') {
+    // Require company email
+    const companyEmail = (settings.defaultAssignee || '').trim();
+    if (!companyEmail) {
+      errors.push('Company email is required');
+    } else {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(settings.defaultAssignee)) {
-        errors.push('Invalid email address for default assignee');
+      if (!emailRegex.test(companyEmail)) {
+        errors.push('Invalid company email');
       }
     }
 
@@ -138,7 +141,18 @@ class Config {
    */
   async isConfigured() {
     const base = await this.ensureBaseConfigLoaded();
-    return !!(base.freescoutUrl && base.apiKey && base.mailboxId);
+    const defaultAssignee = await this.getSetting('defaultAssignee');
+    return !!(base.freescoutUrl && base.apiKey && base.mailboxId && this.isCompanyEmailValid(defaultAssignee));
+  }
+
+  /**
+   * Validate the company email value
+   */
+  isCompanyEmailValid(value) {
+    const email = (value || '').trim();
+    if (!email) return false;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   }
 
   /**

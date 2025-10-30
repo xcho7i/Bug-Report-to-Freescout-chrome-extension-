@@ -318,10 +318,9 @@ body {
   width: 48%;
 }
 
-#toggleDrawBtn {
+#toggleDrawBtn.btn-primary {
   background-color: var(--primary-color);
   color: white;
-
 }
 
 .annotate-field {
@@ -562,6 +561,59 @@ body {
 .success-state p {
   color: var(--text-secondary);
   margin-bottom: 24px;
+}
+
+/* Modal for enlarged image */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.modal-body {
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px;
+  width: 92vw;
+  max-width: 1300px;
+  max-height: 95vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--shadow-lg);
+}
+
+.modal-close {
+  align-self: flex-end;
+  border: 1px solid var(--border-color);
+  background: #fff;
+  border-radius: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+#modalCanvasContainer {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#modalCanvasContainer canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+#modalToolbarContainer {
+  padding-top: 4px;
 }
 
 /* Settings View */

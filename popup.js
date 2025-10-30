@@ -37,7 +37,15 @@ class BugReporter {
     const isConfigured = await config.isConfigured();
     if (!isConfigured) {
       this.showSettings();
-      this.showNotification('Please configure FreeScout settings first', 'warning');
+      try {
+        const email = await config.getSetting('defaultAssignee');
+        const msg = config.isCompanyEmailValid(email)
+          ? 'Please configure FreeScout settings first'
+          : 'Please enter your Company Email to continue';
+        this.showNotification(msg, 'warning');
+      } catch (_) {
+        this.showNotification('Please complete settings before use', 'warning');
+      }
     }
 
     // Load settings
@@ -51,6 +59,14 @@ class BugReporter {
     const settings = await config.getSettings();
     this.maxRecordingTime = settings.maxRecordingTime || 30;
     this._harCapture.enabled = settings.includeHar !== false;
+    try {
+      this._emailOk = config.isCompanyEmailValid(settings.defaultAssignee);
+    } catch (_) {
+      this._emailOk = false;
+    }
+    if (typeof this.updateEmailDependentControls === 'function') {
+      this.updateEmailDependentControls();
+    }
   }
 
   /**
@@ -139,6 +155,9 @@ class BugReporter {
     // Load settings into form
     this.loadSettingsForm();
 
+    // Disable actions if company email missing
+    this.updateEmailDependentControls();
+
     // Auto-start when opened as standalone recording window
     if (window.location.hash.includes('autostart=record') && !this._autoStarted) {
       this._autoStarted = true;
@@ -150,10 +169,29 @@ class BugReporter {
     }
   }
 
+  updateEmailDependentControls() {
+    const emailOk = !!this._emailOk;
+    const ids = ['screenshotBtn', 'recordBtn', 'attachBtn', 'submitBtn'];
+    ids.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.disabled = !emailOk;
+        el.title = emailOk ? '' : 'Set Company Email in Settings first';
+      }
+    });
+    const attachInput = document.getElementById('attachInput');
+    if (attachInput) attachInput.disabled = !emailOk;
+  }
+
   /**
    * Capture screenshot
    */
   async captureScreenshot(_bypassWindowOpen = false) {
+    if (!this._emailOk) {
+      this.showSettings();
+      this.showNotification('Please enter Company Email before capturing.', 'warning');
+      return;
+    }
     try {
       // If we're in the action popup, open a persistent window to avoid popup closing on blur
       if (!this.isStandaloneWindow && !_bypassWindowOpen) {
@@ -224,6 +262,11 @@ class BugReporter {
    * Start screen recording
    */
   async startRecording() {
+    if (!this._emailOk) {
+      this.showSettings();
+      this.showNotification('Please enter Company Email before recording.', 'warning');
+      return;
+    }
     try {
       // If we are in the action popup (not standalone), open a dedicated, persistent window
       if (!this.isStandaloneWindow) {
@@ -480,6 +523,11 @@ class BugReporter {
         window.addEventListener('mouseup', end);
         canvas.addEventListener('mouseleave', end);
 
+        // Click to enlarge in modal view
+        canvas.addEventListener('click', () => {
+          this.openImageModal();
+        });
+
         // Touch
         canvas.addEventListener('touchstart', (e) => { e.preventDefault(); start(e.touches[0]); });
         canvas.addEventListener('touchmove', (e) => { e.preventDefault(); move(e.touches[0]); });
@@ -487,7 +535,7 @@ class BugReporter {
 
         previewContainer.appendChild(canvas);
         const tb = document.getElementById('annotateToolbar');
-        if (tb) tb.classList.remove('hidden');
+        if (tb) tb.classList.add('hidden');
       };
       image.src = url;
     } else if (type === 'attachmentImage') {
@@ -583,11 +631,69 @@ class BugReporter {
     this.redrawCanvas();
   }
 
+  openImageModal() {
+    const modal = document.getElementById('imageModal');
+    if (!modal || !this.annotation.canvas) return;
+    const modalCanvasContainer = document.getElementById('modalCanvasContainer');
+    const modalToolbarContainer = document.getElementById('modalToolbarContainer');
+    const toolbar = document.getElementById('annotateToolbar');
+    const previewContainer = document.getElementById('previewContainer');
+
+    // Remember where to restore
+    this._prevCanvasParent = previewContainer;
+    this._prevToolbarParent = toolbar && toolbar.parentElement;
+
+    // Move canvas and toolbar to modal
+    if (modalCanvasContainer && this.annotation.canvas.parentElement !== modalCanvasContainer) {
+      modalCanvasContainer.appendChild(this.annotation.canvas);
+      this.annotation.canvas.style.maxWidth = '100%';
+    }
+    if (modalToolbarContainer && toolbar && toolbar.parentElement !== modalToolbarContainer) {
+      modalToolbarContainer.appendChild(toolbar);
+      toolbar.classList.remove('hidden');
+    }
+
+    // Show modal
+    modal.classList.remove('hidden');
+
+    const closeBtn = document.getElementById('closeImageModal');
+    const onClose = () => this.closeImageModal();
+    if (closeBtn) closeBtn.onclick = onClose;
+    modal.onclick = (e) => { if (e.target === modal) onClose(); };
+    window.addEventListener('keydown', this._onEscClose = (e) => { if (e.key === 'Escape') onClose(); });
+  }
+
+  closeImageModal() {
+    const modal = document.getElementById('imageModal');
+    if (!modal) return;
+    const toolbar = document.getElementById('annotateToolbar');
+
+    // Restore canvas and toolbar
+    if (this._prevCanvasParent && this.annotation.canvas && this.annotation.canvas.parentElement !== this._prevCanvasParent) {
+      this._prevCanvasParent.appendChild(this.annotation.canvas);
+    }
+    if (this._prevToolbarParent && toolbar && toolbar.parentElement !== this._prevToolbarParent) {
+      // Place toolbar back before notes section for layout and hide it in small view
+      this._prevToolbarParent.insertBefore(toolbar, this._prevToolbarParent.querySelector('.notes-section'));
+      toolbar.classList.add('hidden');
+    }
+
+    // Hide modal
+    modal.classList.add('hidden');
+    try { if (this._onEscClose) window.removeEventListener('keydown', this._onEscClose); } catch (_) {}
+    this._onEscClose = null;
+  }
+
   /**
    * Submit bug report to FreeScout
    */
   async submitBugReport() {
     try {
+      if (!this._emailOk) {
+        this.showSettings();
+        this.showNotification('Please enter Company Email before submitting.', 'warning');
+        return;
+      }
       // Validate inputs
       const title = document.getElementById('bugTitle').value.trim();
       const notes = document.getElementById('bugNotes').value.trim();
@@ -664,6 +770,11 @@ class BugReporter {
   }
 
   handleAttachFiles(event) {
+    if (!this._emailOk) {
+      this.showSettings();
+      this.showNotification('Please enter Company Email before attaching files.', 'warning');
+      return;
+    }
     const files = Array.from(event.target.files || []);
     const maxSize = 50 * 1024 * 1024;
     if (!files.length) return;

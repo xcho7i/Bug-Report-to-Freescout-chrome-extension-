@@ -22,6 +22,7 @@ class BugReporter {
       size: 4,
       baseImageUrl: null
     };
+    this.currentMediaType = null;
     this._harCapture = {
       enabled: false,
       tabId: null,
@@ -467,6 +468,7 @@ class BugReporter {
    * Show preview of captured media
    */
   showPreview(url, type) {
+    this.currentMediaType = type;
     const previewContainer = document.getElementById('previewContainer');
     const previewTitleEl = document.getElementById('previewTitle');
     previewContainer.innerHTML = '';
@@ -557,6 +559,7 @@ class BugReporter {
       previewContainer.appendChild(video);
       const tb = document.getElementById('annotateToolbar');
       if (tb) tb.classList.add('hidden');
+      this.annotation.drawingEnabled = false;
     } else {
       // No preview (non-image attachments only)
       previewContainer.innerHTML = '';
@@ -659,6 +662,8 @@ class BugReporter {
     const closeBtn = document.getElementById('closeImageModal');
     const onClose = () => this.closeImageModal();
     if (closeBtn) closeBtn.onclick = onClose;
+    const continueBtn = document.getElementById('continueImageModal');
+    if (continueBtn) continueBtn.onclick = onClose;
     modal.onclick = (e) => { if (e.target === modal) onClose(); };
     window.addEventListener('keydown', this._onEscClose = (e) => { if (e.key === 'Escape') onClose(); });
   }
@@ -710,9 +715,9 @@ class BugReporter {
         return;
       }
 
-      // If we have an annotated canvas for an image, export that instead
+      // If current preview is an image and we have annotations, export canvas; otherwise keep video/file
       let mainBlob = this.currentBlob;
-      if (this.annotation && this.annotation.canvas) {
+      if (this.currentMediaType === 'image' && this.annotation && this.annotation.canvas) {
         const dataUrl = this.annotation.canvas.toDataURL('image/png');
         mainBlob = await this.dataURLtoBlob(dataUrl);
       }
@@ -720,9 +725,6 @@ class BugReporter {
         this.showNotification('Please capture media or attach a file', 'error');
         return;
       }
-
-      // Show loading
-      this.showLoadingState('Submitting bug report...');
 
       // Get current page info
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -750,6 +752,24 @@ class BugReporter {
           this.additionalFiles.push(new File([harFile], harFile.name || `network-${Date.now()}.har`, { type: 'application/json' }));
         }
       } catch (_) {}
+
+      // Show loading (include file type and size). Handle file-only submissions too.
+      let kind = 'attachment';
+      let sizeStr = '0 B';
+      if (mainBlob) {
+        kind = this.currentMediaType === 'video' ? 'video' : (this.currentMediaType === 'image' ? 'image' : 'attachment');
+        sizeStr = this.formatFileSize(mainBlob.size || 0);
+      } else if (this.additionalFiles && this.additionalFiles.length > 0) {
+        if (this.additionalFiles.length === 1) {
+          kind = 'attachment';
+          sizeStr = this.formatFileSize((this.additionalFiles[0] && this.additionalFiles[0].size) ? this.additionalFiles[0].size : 0);
+        } else {
+          const total = this.additionalFiles.reduce((sum, f) => sum + (f && f.size ? f.size : 0), 0);
+          kind = `${this.additionalFiles.length} attachments`;
+          sizeStr = this.formatFileSize(total);
+        }
+      }
+      this.showLoadingState(`Submitting ${kind} (${sizeStr})...`);
 
       // Submit to FreeScout
       const result = await freeScoutAPI.createTicket(bugData, mainBlob, this.additionalFiles);

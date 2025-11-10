@@ -52,7 +52,11 @@ class Config {
         freescoutUrl: base.freescoutUrl || '',
         apiKey: base.apiKey || '',
         mailboxId: base.mailboxId || '',
-        maxRecordingTime: 30
+        maxRecordingTime: 30,
+        // Pass-through CC list from packaged config; normalize to array
+        alwaysCc: Array.isArray(base.alwaysCc)
+          ? base.alwaysCc
+          : (base.alwaysCc ? [base.alwaysCc] : [])
       };
     } catch (error) {
       // console.error('Error loading settings:', error);
@@ -69,6 +73,12 @@ class Config {
         const base = await this.ensureBaseConfigLoaded();
         return base[key] !== undefined ? base[key] : '';
       }
+      if (key === 'alwaysCc') {
+        const base = await this.ensureBaseConfigLoaded();
+        return Array.isArray(base.alwaysCc)
+          ? base.alwaysCc
+          : (base.alwaysCc ? [base.alwaysCc] : []);
+      }
       if (key === 'maxRecordingTime') {
         return 30;
       }
@@ -78,6 +88,9 @@ class Config {
       // console.error(`Error loading setting ${key}:`, error);
       if (key === 'freescoutUrl' || key === 'apiKey' || key === 'mailboxId') {
         return '';
+      }
+      if (key === 'alwaysCc') {
+        return [];
       }
       if (key === 'maxRecordingTime') {
         return 30;

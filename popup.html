@@ -16,7 +16,7 @@
         max-width: 350px;
         min-width: 330px;
         overflow: auto;
-        margin:0 auto;
+        margin: 0 auto;
       }
     </style>
   </head>
@@ -308,11 +308,7 @@
         </div>
 
         <!-- Loading State -->
-        <div
-          id="loadingState"
-          class="loading-state hidden"
-          style="width: 100%"
-        >
+        <div id="loadingState" class="loading-state hidden" style="width: 100%">
           <div class="spinner"></div>
           <p>Submitting...</p>
         </div>
@@ -349,6 +345,14 @@
           </button>
           <div id="modalCanvasContainer"></div>
           <div id="modalToolbarContainer"></div>
+          <div
+            class="modal-actions"
+            style="display: flex; justify-content: flex-end"
+          >
+            <button id="continueImageModal" class="btn btn-primary">
+              Continue
+            </button>
+          </div>
         </div>
       </div>
 

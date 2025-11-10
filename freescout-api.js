@@ -5,14 +5,33 @@ class FreeScoutAPI {
     this.baseUrl = '';
     this.apiKey = '';
     this.mailboxId = '';
+    this.alwaysCc = [];
   }
 
   async blobToBase64(blob) {
     return await new Promise((resolve, reject) => {
+      if (!blob) {
+        resolve('');
+        return;
+      }
+      // Use ArrayBuffer for more reliable binary data handling
       const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result.split(',')[1]);
+      reader.onloadend = () => {
+        if (!reader.result) {
+          resolve('');
+          return;
+        }
+        // Convert ArrayBuffer to base64
+        const bytes = new Uint8Array(reader.result);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const base64 = btoa(binary);
+        resolve(base64);
+      };
       reader.onerror = reject;
-      reader.readAsDataURL(blob);
+      reader.readAsArrayBuffer(blob);
     });
   }
 
@@ -25,6 +44,9 @@ class FreeScoutAPI {
     this.apiKey = settings.apiKey;
     this.mailboxId = settings.mailboxId;
     this.defaultAssignee = settings.defaultAssignee;
+    this.alwaysCc = Array.isArray(settings.alwaysCc)
+      ? settings.alwaysCc.filter(Boolean)
+      : (settings.alwaysCc ? [settings.alwaysCc] : []);
   }
 
   /**
@@ -73,6 +95,8 @@ class FreeScoutAPI {
     }
   }
 
+
+  
   /**
    * Create a conversation (ticket) in FreeScout
    */
@@ -104,7 +128,8 @@ class FreeScoutAPI {
           text: body,
           customer: {
             email: this.defaultAssignee || 'bugs@system.local'
-          }
+          },
+          cc: this.alwaysCc && this.alwaysCc.length ? this.alwaysCc : undefined
         }
       ],
       imported: false,
@@ -115,6 +140,11 @@ class FreeScoutAPI {
     const tags = ['bug-reporter', bugData.type];
     if (bugData.priority === '1') tags.push('high-priority');
     requestData.tags = tags;
+
+    // Add CC at conversation level when available
+    if (this.alwaysCc && this.alwaysCc.length) {
+      requestData.cc = this.alwaysCc;
+    }
 
     let lastErrText = '';
     for (const apiUrl of candidateUrls) {
@@ -212,7 +242,8 @@ class FreeScoutAPI {
           body: JSON.stringify({
             type: 'customer',
             text: inlineBody,
-            customer: { email: 'bugs@system.local' }
+            customer: { email: 'bugs@system.local' },
+            cc: this.alwaysCc && this.alwaysCc.length ? this.alwaysCc : undefined
           })
         });
         if (!inlineRes.ok) {
@@ -221,7 +252,6 @@ class FreeScoutAPI {
         }
         return await inlineRes.json();
       } catch (e) {
-        // console.error('Inline image post error:', e);
         throw e;
       }
     }
@@ -264,6 +294,7 @@ class FreeScoutAPI {
       type: typeVal,
       text: descriptionText || '',
       customer: { email: this.defaultAssignee || 'bugs@system.local' },
+      cc: this.alwaysCc && this.alwaysCc.length ? this.alwaysCc : undefined,
       attachments: [
         {
           fileName: fileName,

@@ -586,7 +586,6 @@ body {
   max-height: 95vh;
   display: flex;
   flex-direction: column;
-  gap: 10px;
   box-shadow: var(--shadow-lg);
 }
 
